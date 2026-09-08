@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "loja-compre-bem-main",
-    "slug": "loja-compre-bem-main",
+    "name": "Loja Compre Bem",
+    "slug": "loja-compre-bem",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
