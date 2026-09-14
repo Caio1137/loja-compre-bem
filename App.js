@@ -268,10 +268,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F6F7FB',
-    paddingHorizontal: 16,
   },
   listaConteudo: {
     paddingBottom: 24,
+    paddingHorizontal: 16,
   },
   titulo: {
     color: '#1B3A5C',
@@ -311,7 +311,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     marginBottom: 12,
+    minWidth: 0,
     padding: 12,
+    width: '100%',
   },
   imagemLista: {
     backgroundColor: '#E8EDF2',
@@ -322,6 +324,7 @@ const styles = StyleSheet.create({
   },
   informacoesCard: {
     flex: 1,
+    minWidth: 0,
   },
   nomeProduto: {
     color: '#1B3A5C',
@@ -342,15 +345,17 @@ const styles = StyleSheet.create({
   linhaAcoes: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginTop: 9,
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 12,
   },
   botaoPequeno: {
     alignItems: 'center',
     backgroundColor: '#E8EDF2',
     borderRadius: 4,
-    height: 25,
+    height: 44,
     justifyContent: 'center',
-    width: 25,
+    width: 44,
   },
   textoBotaoPequeno: {
     color: '#1B3A5C',
@@ -360,10 +365,16 @@ const styles = StyleSheet.create({
   quantidade: {
     color: '#4C5968',
     fontSize: 13,
-    marginHorizontal: 7,
+    minHeight: 44,
+    textAlignVertical: 'center',
   },
   botaoFavorito: {
-    marginLeft: 'auto',
+    alignItems: 'center',
+    backgroundColor: '#E8EDF2',
+    borderRadius: 4,
+    justifyContent: 'center',
+    minHeight: 44,
+    paddingHorizontal: 10,
   },
   textoFavorito: {
     color: '#1B3A5C',
