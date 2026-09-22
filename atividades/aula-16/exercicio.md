@@ -40,4 +40,4 @@ Os favoritos também foram ajustados para usar `@compre_bem:favoritos`, com os i
 
 ## Teste
 
-O build web foi compilado sem erros. Antes da entrega, ainda preciso fazer o teste no Expo Go: digitar uma busca, fechar o app pela tela de aplicativos recentes, abrir novamente e conferir se o texto continua no campo.
+No Expo Go, digitei uma busca, fechei o app pela tela de aplicativos recentes e abri novamente. O texto continuou no campo de busca. Também confirmei que um produto marcado como salvo continuou marcado depois de reabrir.
