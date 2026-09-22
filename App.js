@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import {
   FlatList,
@@ -14,6 +15,8 @@ import {
 } from 'react-native';
 
 const Stack = createNativeStackNavigator();
+const CHAVE_FAVORITOS = '@compre_bem:favoritos';
+const CHAVE_ULTIMA_BUSCA = '@compre_bem:ultima_busca';
 
 const produtosIniciais = [
   {
@@ -66,8 +69,7 @@ const produtosIniciais = [
   },
 ];
 
-function ProdutoItem({ produto, categoria, onPress }) {
-  const [favorito, setFavorito] = useState(false);
+function ProdutoItem({ produto, categoria, favorito, onAlternarFavorito, onPress }) {
   const [quantidade, setQuantidade] = useState(0);
 
   function diminuirQuantidade() {
@@ -96,7 +98,7 @@ function ProdutoItem({ produto, categoria, onPress }) {
           >
             <Text style={styles.textoBotaoPequeno}>+</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.botaoFavorito} onPress={() => setFavorito(!favorito)}>
+          <TouchableOpacity style={styles.botaoFavorito} onPress={onAlternarFavorito}>
             <Text style={styles.textoFavorito}>{favorito ? 'Salvo' : 'Salvar'}</Text>
           </TouchableOpacity>
         </View>
@@ -106,24 +108,80 @@ function ProdutoItem({ produto, categoria, onPress }) {
 }
 
 function TelaListaProdutos({ navigation, produtos }) {
+  const [favoritos, setFavoritos] = useState([]);
+  const [busca, setBusca] = useState('');
+
+  useEffect(() => {
+    async function carregarDadosSalvos() {
+      try {
+        const favoritosSalvos = await AsyncStorage.getItem(CHAVE_FAVORITOS);
+        const buscaSalva = await AsyncStorage.getItem(CHAVE_ULTIMA_BUSCA);
+
+        if (favoritosSalvos) {
+          setFavoritos(JSON.parse(favoritosSalvos));
+        }
+
+        if (buscaSalva) {
+          setBusca(buscaSalva);
+        }
+      } catch (error) {
+        setFavoritos([]);
+      }
+    }
+
+    carregarDadosSalvos();
+  }, []);
+
+  function alternarFavorito(id) {
+    setFavoritos((atual) => {
+      const novosFavoritos = atual.includes(id)
+        ? atual.filter((favoritoId) => favoritoId !== id)
+        : [...atual, id];
+
+      AsyncStorage.setItem(CHAVE_FAVORITOS, JSON.stringify(novosFavoritos));
+      return novosFavoritos;
+    });
+  }
+
+  function atualizarBusca(texto) {
+    setBusca(texto);
+    AsyncStorage.setItem(CHAVE_ULTIMA_BUSCA, texto);
+  }
+
+  const textoBusca = busca.trim().toLowerCase();
+  const produtosFiltrados = produtos.filter((produto) => (
+    produto.nome.toLowerCase().includes(textoBusca)
+    || produto.categoria.toLowerCase().includes(textoBusca)
+  ));
+
   return (
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.listaConteudo}
-      data={produtos}
+      data={produtosFiltrados}
       keyExtractor={(produto) => produto.id}
       renderItem={({ item }) => (
         <ProdutoItem
           produto={item}
           categoria={item.categoria}
+          favorito={favoritos.includes(item.id)}
+          onAlternarFavorito={() => alternarFavorito(item.id)}
           onPress={() => navigation.navigate('DetalheProduto', { produtoId: item.id })}
         />
       )}
+      ListEmptyComponent={<Text style={styles.listaVazia}>Nenhum produto encontrado.</Text>}
       ListHeaderComponent={
         <>
           <StatusBar style="auto" />
           <Text style={styles.titulo}>Loja Compre Bem</Text>
           <Text style={styles.subtitulo}>Produtos para deixar seu espaço de trabalho mais prático.</Text>
+
+          <TextInput
+            style={styles.inputBusca}
+            placeholder="Buscar por produto ou categoria"
+            value={busca}
+            onChangeText={atualizarBusca}
+          />
 
           <TouchableOpacity
             style={styles.botaoPrincipal}
@@ -441,6 +499,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingHorizontal: 12,
     paddingVertical: 11,
+  },
+  inputBusca: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#B8C3CF',
+    borderRadius: 6,
+    borderWidth: 1,
+    fontSize: 15,
+    marginBottom: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  listaVazia: {
+    color: '#4C5968',
+    fontSize: 15,
+    marginTop: 12,
+    textAlign: 'center',
   },
   erro: {
     color: '#C62828',
