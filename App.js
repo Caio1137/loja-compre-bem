@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { useCallback, useEffect, useState } from 'react';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Keyboard,
@@ -18,56 +19,38 @@ const Stack = createNativeStackNavigator();
 const CHAVE_FAVORITOS = '@compre_bem:favoritos';
 const CHAVE_ULTIMA_BUSCA = '@compre_bem:ultima_busca';
 
-const produtosIniciais = [
-  {
-    id: '1',
-    nome: 'Cadeira Confort Plus',
-    preco: 'R$ 349,90',
-    categoria: 'Móveis',
-    descricao: 'Cadeira para escritório com encosto acolchoado e apoio lombar.',
-    imagem: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=500&q=80',
-  },
-  {
-    id: '2',
-    nome: 'Mesa Escritório Slim',
-    preco: 'R$ 459,00',
-    categoria: 'Móveis',
-    descricao: 'Mesa compacta de madeira com espaço para notebook e materiais.',
-    imagem: 'https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?auto=format&fit=crop&w=500&q=80',
-  },
-  {
-    id: '3',
-    nome: 'Luminária de Mesa LED',
-    preco: 'R$ 89,90',
-    categoria: 'Iluminação',
-    descricao: 'Luminária articulada com luz branca para estudo e trabalho.',
-    imagem: 'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?auto=format&fit=crop&w=500&q=80',
-  },
-  {
-    id: '4',
-    nome: 'Suporte para Notebook',
-    preco: 'R$ 129,90',
-    categoria: 'Informática',
-    descricao: 'Suporte ajustável que melhora a altura da tela do notebook.',
-    imagem: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=500&q=80',
-  },
-  {
-    id: '5',
-    nome: 'Teclado Sem Fio Compacto',
-    preco: 'R$ 159,90',
-    categoria: 'Informática',
-    descricao: 'Teclado sem fio com conexão Bluetooth e formato compacto.',
-    imagem: 'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=500&q=80',
-  },
-  {
-    id: '6',
-    nome: 'Organizador de Mesa',
-    preco: 'R$ 49,90',
-    categoria: 'Organização',
-    descricao: 'Organizador para canetas, papéis e objetos pequenos da mesa.',
-    imagem: 'https://images.unsplash.com/photo-1494438639946-1ebd1d20bf85?auto=format&fit=crop&w=500&q=80',
-  },
-];
+// No celular com Expo Go, troque localhost pelo IP do computador na rede.
+const API_URL = 'http://localhost:8080/api/v1';
+const IMAGEM_PADRAO = 'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=500&q=80';
+
+function formatarPreco(preco) {
+  return `R$ ${Number(preco).toFixed(2).replace('.', ',')}`;
+}
+
+async function buscarProdutos() {
+  const resposta = await fetch(`${API_URL}/produtos`);
+
+  if (!resposta.ok) {
+    throw new Error(`Erro ${resposta.status} ao buscar produtos.`);
+  }
+
+  const pagina = await resposta.json();
+  return pagina.content;
+}
+
+async function cadastrarProduto(produto) {
+  const resposta = await fetch(`${API_URL}/produtos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(produto),
+  });
+
+  if (!resposta.ok) {
+    throw new Error(`Erro ${resposta.status} ao cadastrar produto.`);
+  }
+
+  return resposta.json();
+}
 
 function ProdutoItem({ produto, categoria, favorito, onAlternarFavorito, onPress }) {
   const [quantidade, setQuantidade] = useState(0);
@@ -85,7 +68,7 @@ function ProdutoItem({ produto, categoria, favorito, onAlternarFavorito, onPress
       <View style={styles.informacoesCard}>
         <Text style={styles.nomeProduto}>{produto.nome}</Text>
         <Text style={styles.categoria}>Categoria: {categoria}</Text>
-        <Text style={styles.preco}>{produto.preco}</Text>
+        <Text style={styles.preco}>{formatarPreco(produto.preco)}</Text>
 
         <View style={styles.linhaAcoes}>
           <TouchableOpacity style={styles.botaoPequeno} onPress={diminuirQuantidade}>
@@ -107,9 +90,30 @@ function ProdutoItem({ produto, categoria, favorito, onAlternarFavorito, onPress
   );
 }
 
-function TelaListaProdutos({ navigation, produtos }) {
+function TelaListaProdutos({ navigation, produtos, onProdutosCarregados }) {
   const [favoritos, setFavoritos] = useState([]);
   const [busca, setBusca] = useState('');
+  const [carregando, setCarregando] = useState(true);
+  const [erroApi, setErroApi] = useState('');
+
+  const carregarProdutos = useCallback(async () => {
+    setCarregando(true);
+    setErroApi('');
+
+    try {
+      onProdutosCarregados(await buscarProdutos());
+    } catch (error) {
+      setErroApi('Não foi possível carregar os produtos. Verifique se a API está ligada.');
+    } finally {
+      setCarregando(false);
+    }
+  }, [onProdutosCarregados]);
+
+  useFocusEffect(
+    useCallback(() => {
+      carregarProdutos();
+    }, [carregarProdutos]),
+  );
 
   useEffect(() => {
     async function carregarDadosSalvos() {
@@ -159,17 +163,21 @@ function TelaListaProdutos({ navigation, produtos }) {
       style={styles.container}
       contentContainerStyle={styles.listaConteudo}
       data={produtosFiltrados}
-      keyExtractor={(produto) => produto.id}
+      keyExtractor={(produto) => produto.produtoId}
       renderItem={({ item }) => (
         <ProdutoItem
           produto={item}
           categoria={item.categoria}
-          favorito={favoritos.includes(item.id)}
-          onAlternarFavorito={() => alternarFavorito(item.id)}
-          onPress={() => navigation.navigate('DetalheProduto', { produtoId: item.id })}
+          favorito={favoritos.includes(item.produtoId)}
+          onAlternarFavorito={() => alternarFavorito(item.produtoId)}
+          onPress={() => navigation.navigate('DetalheProduto', { produtoId: item.produtoId })}
         />
       )}
-      ListEmptyComponent={<Text style={styles.listaVazia}>Nenhum produto encontrado.</Text>}
+      ListEmptyComponent={
+        carregando
+          ? <ActivityIndicator style={styles.carregando} size="large" color="#1B3A5C" />
+          : <Text style={erroApi ? styles.erroLista : styles.listaVazia}>{erroApi || 'Nenhum produto encontrado.'}</Text>
+      }
       ListHeaderComponent={
         <>
           <StatusBar style="auto" />
@@ -200,21 +208,29 @@ function TelaListaProdutos({ navigation, produtos }) {
 
 function TelaDetalheProduto({ route, produtos }) {
   const { produtoId } = route.params;
-  const produto = produtos.find((item) => item.id === produtoId) ?? produtos[0];
+  const produto = produtos.find((item) => item.produtoId === produtoId);
+
+  if (!produto) {
+    return (
+      <View style={styles.containerDetalhe}>
+        <Text style={styles.listaVazia}>Produto não encontrado.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.containerDetalhe}>
       <StatusBar style="auto" />
       <Image source={{ uri: produto.imagem }} style={styles.imagemDetalhe} />
       <Text style={styles.nomeDetalhe}>{produto.nome}</Text>
-      <Text style={styles.precoDetalhe}>{produto.preco}</Text>
+      <Text style={styles.precoDetalhe}>{formatarPreco(produto.preco)}</Text>
       <Text style={styles.categoriaDetalhe}>Categoria: {produto.categoria}</Text>
       <Text style={styles.descricaoDetalhe}>{produto.descricao}</Text>
     </View>
   );
 }
 
-function TelaCadastroProduto({ navigation, onAdicionarProduto }) {
+function TelaCadastroProduto({ navigation }) {
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
   const [categoria, setCategoria] = useState('');
@@ -225,7 +241,7 @@ function TelaCadastroProduto({ navigation, onAdicionarProduto }) {
     setErro('');
   }
 
-  function validarESalvar() {
+  async function validarESalvar() {
     if (nome.trim() === '') {
       setErro('O nome do produto não pode ficar vazio.');
       return;
@@ -242,14 +258,19 @@ function TelaCadastroProduto({ navigation, onAdicionarProduto }) {
       return;
     }
 
-    onAdicionarProduto({
-      id: Date.now().toString(),
-      nome: nome.trim(),
-      preco: `R$ ${precoNumerico.toFixed(2).replace('.', ',')}`,
-      categoria: categoria.trim(),
-      descricao: 'Produto cadastrado pela equipe da Loja Compre Bem.',
-      imagem: 'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=format&fit=crop&w=500&q=80',
-    });
+    try {
+      await cadastrarProduto({
+        nome: nome.trim(),
+        preco: precoNumerico,
+        categoria: categoria.trim(),
+        descricao: 'Produto cadastrado pela equipe da Loja Compre Bem.',
+        imagem: IMAGEM_PADRAO,
+        quantidade: 0,
+      });
+    } catch (error) {
+      setErro('Não foi possível cadastrar o produto na API. Tente novamente.');
+      return;
+    }
 
     Keyboard.dismiss();
     navigation.goBack();
@@ -299,24 +320,22 @@ function TelaCadastroProduto({ navigation, onAdicionarProduto }) {
 }
 
 export default function App() {
-  const [produtos, setProdutos] = useState(produtosIniciais);
-
-  function adicionarProduto(produto) {
-    setProdutos((listaAtual) => [...listaAtual, produto]);
-  }
+  const [produtos, setProdutos] = useState([]);
 
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="ListaProdutos">
         <Stack.Screen name="ListaProdutos" options={{ title: 'Loja Compre Bem' }}>
-          {(props) => <TelaListaProdutos {...props} produtos={produtos} />}
+          {(props) => <TelaListaProdutos {...props} produtos={produtos} onProdutosCarregados={setProdutos} />}
         </Stack.Screen>
         <Stack.Screen name="DetalheProduto" options={{ title: 'Detalhe do produto' }}>
           {(props) => <TelaDetalheProduto {...props} produtos={produtos} />}
         </Stack.Screen>
-        <Stack.Screen name="CadastroProduto" options={{ title: 'Cadastro de produto' }}>
-          {(props) => <TelaCadastroProduto {...props} onAdicionarProduto={adicionarProduto} />}
-        </Stack.Screen>
+        <Stack.Screen
+          name="CadastroProduto"
+          component={TelaCadastroProduto}
+          options={{ title: 'Cadastro de produto' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -509,6 +528,15 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingHorizontal: 12,
     paddingVertical: 11,
+  },
+  carregando: {
+    marginTop: 24,
+  },
+  erroLista: {
+    color: '#C62828',
+    fontSize: 15,
+    marginTop: 12,
+    textAlign: 'center',
   },
   listaVazia: {
     color: '#4C5968',
