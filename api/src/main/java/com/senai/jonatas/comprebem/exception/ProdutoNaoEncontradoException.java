@@ -1,0 +1,10 @@
+package com.senai.jonatas.comprebem.exception;
+
+import java.util.UUID;
+
+public class ProdutoNaoEncontradoException extends RuntimeException {
+
+    public ProdutoNaoEncontradoException(UUID id) {
+        super("Produto não encontrado: " + id);
+    }
+}

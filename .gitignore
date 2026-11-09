@@ -42,3 +42,7 @@ yarn-error.*
 
 # build web de teste
 .expo-web-test-export/
+
+# Resultados temporários dos testes (as capturas de entrega são versionadas)
+test-results/
+playwright-report/

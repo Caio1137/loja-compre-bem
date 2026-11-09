@@ -5,7 +5,8 @@ const CHAVE_ULTIMA_BUSCA = '@compre_bem:ultima_busca';
 
 export async function carregarFavoritos(): Promise<string[]> {
   const favoritosSalvos = await AsyncStorage.getItem(CHAVE_FAVORITOS);
-  return favoritosSalvos ? (JSON.parse(favoritosSalvos) as string[]) : [];
+  const dados: unknown = favoritosSalvos ? JSON.parse(favoritosSalvos) : [];
+  return Array.isArray(dados) ? dados.filter((id): id is string => typeof id === 'string') : [];
 }
 
 export async function salvarFavoritos(favoritos: string[]): Promise<void> {

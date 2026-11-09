@@ -1,5 +1,5 @@
 export type RootStackParamList = {
-  ListaProdutos: undefined;
+  ListaProdutos: { mensagem?: string } | undefined;
   DetalheProduto: { produtoId: string };
-  CadastroProduto: undefined;
+  CadastroProduto: { produtoId?: string } | undefined;
 };

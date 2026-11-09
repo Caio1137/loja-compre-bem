@@ -1,201 +1,107 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import ProdutoItem from '../components/ProdutoItem';
-import {
-  carregarFavoritos,
-  carregarUltimaBusca,
-  salvarFavoritos,
-  salvarUltimaBusca,
-} from '../services/preferenciasStorage';
-import { buscarProdutos } from '../services/produtosService';
+import { useProdutosPaginados } from '../hooks/useProdutosPaginados';
+import { carregarFavoritos, carregarUltimaBusca, salvarFavoritos, salvarUltimaBusca } from '../services/preferenciasStorage';
 import { styles } from '../styles/styles';
 import type { RootStackParamList } from '../types/navigation';
-import type { Page } from '../types/page';
-import type { Produto } from '../types/produto';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ListaProdutos'>;
-type InfoPagina = Page<Produto>['page'];
 
-const ESPERA_BUSCA_MS = 400;
-
-export default function ListaProdutosScreen({ navigation }: Props) {
+export default function ListaProdutosScreen({ navigation, route }: Props) {
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [busca, setBusca] = useState('');
-  const [produtos, setProdutos] = useState<Produto[]>([]);
-  const [infoPagina, setInfoPagina] = useState<InfoPagina | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [carregandoMais, setCarregandoMais] = useState(false);
-  const [erroApi, setErroApi] = useState('');
-  const [tentativa, setTentativa] = useState(0);
+  const [pronto, setPronto] = useState(false);
+  const [aviso, setAviso] = useState('');
+  const lista = useProdutosPaginados(busca, pronto);
 
   useEffect(() => {
-    async function carregarDadosSalvos() {
-      try {
-        setFavoritos(await carregarFavoritos());
-        setBusca(await carregarUltimaBusca());
-      } catch {
-        setFavoritos([]);
-      }
-    }
-
-    carregarDadosSalvos();
+    let ativo = true;
+    Promise.all([carregarFavoritos(), carregarUltimaBusca()])
+      .then(([salvos, ultimaBusca]) => {
+        if (ativo) { setFavoritos(salvos); setBusca(ultimaBusca); }
+      })
+      .catch(() => { if (ativo) setAviso('Não foi possível recuperar suas preferências salvas.'); })
+      .finally(() => { if (ativo) setPronto(true); });
+    return () => { ativo = false; };
   }, []);
 
-  // Busca a primeira página na API sempre que a tela ganha foco ou a busca muda.
-  useFocusEffect(
-    useCallback(() => {
-      let ativo = true;
-      setCarregando(true);
-      setErroApi('');
-
-      const temporizador = setTimeout(async () => {
-        try {
-          const resposta = await buscarProdutos(busca);
-
-          if (ativo) {
-            setProdutos(resposta.content);
-            setInfoPagina(resposta.page);
-          }
-        } catch {
-          if (ativo) {
-            setProdutos([]);
-            setInfoPagina(null);
-            setErroApi('Não foi possível carregar os produtos. Verifique se a API está ligada.');
-          }
-        } finally {
-          if (ativo) {
-            setCarregando(false);
-          }
-        }
-      }, ESPERA_BUSCA_MS);
-
-      return () => {
-        ativo = false;
-        clearTimeout(temporizador);
-      };
-    }, [busca, tentativa]),
-  );
-
-  async function carregarMaisProdutos() {
-    if (!infoPagina || carregandoMais) {
-      return;
-    }
-
-    setCarregandoMais(true);
-
-    try {
-      const resposta = await buscarProdutos(busca, infoPagina.number + 1);
-      setProdutos((atuais) => [...atuais, ...resposta.content]);
-      setInfoPagina(resposta.page);
-    } catch {
-      setErroApi('Não foi possível carregar mais produtos.');
-    } finally {
-      setCarregandoMais(false);
-    }
-  }
-
   function alternarFavorito(produtoId: string) {
-    setFavoritos((atual) => {
-      const novosFavoritos = atual.includes(produtoId)
-        ? atual.filter((favoritoId) => favoritoId !== produtoId)
-        : [...atual, produtoId];
-
-      salvarFavoritos(novosFavoritos);
-      return novosFavoritos;
-    });
+    const novos = favoritos.includes(produtoId)
+      ? favoritos.filter((id) => id !== produtoId) : [...favoritos, produtoId];
+    setFavoritos(novos);
+    salvarFavoritos(novos).catch(() => setAviso('Não foi possível salvar os favoritos neste aparelho.'));
   }
 
   function atualizarBusca(texto: string) {
     setBusca(texto);
-    salvarUltimaBusca(texto);
-  }
-
-  const temMaisPaginas = infoPagina !== null && infoPagina.number + 1 < infoPagina.totalPages;
-
-  function renderizarEstadoVazio() {
-    if (carregando) {
-      return <ActivityIndicator style={styles.carregando} size="large" color="#1B3A5C" />;
-    }
-
-    if (erroApi !== '') {
-      return (
-        <>
-          <Text style={styles.erroLista}>{erroApi}</Text>
-          <TouchableOpacity
-            style={styles.botaoCarregarMais}
-            onPress={() => setTentativa((atual) => atual + 1)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.textoBotaoCarregarMais}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </>
-      );
-    }
-
-    return <Text style={styles.listaVazia}>Nenhum produto encontrado.</Text>;
+    salvarUltimaBusca(texto).catch(() => setAviso('Não foi possível guardar a última busca neste aparelho.'));
   }
 
   return (
     <FlatList
+      testID="lista-produtos"
       style={styles.container}
       contentContainerStyle={styles.listaConteudo}
-      data={produtos}
+      data={lista.produtos}
       keyExtractor={(produto) => produto.produtoId}
       keyboardShouldPersistTaps="handled"
+      onEndReached={() => { void lista.carregarMais(); }}
+      onEndReachedThreshold={0.35}
+      refreshing={lista.carregando}
+      onRefresh={lista.atualizar}
       renderItem={({ item }) => (
-        <ProdutoItem
-          produto={item}
-          favorito={favoritos.includes(item.produtoId)}
+        <ProdutoItem produto={item} favorito={favoritos.includes(item.produtoId)}
           onAlternarFavorito={() => alternarFavorito(item.produtoId)}
-          onPress={() => navigation.navigate('DetalheProduto', { produtoId: item.produtoId })}
-        />
+          onPress={() => navigation.navigate('DetalheProduto', { produtoId: item.produtoId })} />
       )}
-      ListEmptyComponent={renderizarEstadoVazio}
       ListHeaderComponent={
         <>
-          <StatusBar style="auto" />
+          <StatusBar style="dark" />
           <Text style={styles.titulo}>Loja Compre Bem</Text>
           <Text style={styles.subtitulo}>Produtos para deixar seu espaço de trabalho mais prático.</Text>
-
-          <TextInput
-            style={styles.inputBusca}
-            placeholder="Buscar por produto ou categoria"
-            value={busca}
-            onChangeText={atualizarBusca}
-          />
-
-          <TouchableOpacity
-            style={styles.botaoPrincipal}
-            onPress={() => navigation.navigate('CadastroProduto')}
-            activeOpacity={0.8}
-          >
+          {route.params?.mensagem && <Text accessibilityRole="alert" style={styles.sucesso}>{route.params.mensagem}</Text>}
+          {aviso !== '' && <Text accessibilityRole="alert" style={styles.erro}>{aviso}</Text>}
+          <TextInput style={styles.inputBusca} accessibilityLabel="Buscar produtos"
+            placeholder="Buscar por produto ou categoria" value={busca} onChangeText={atualizarBusca} />
+          <TouchableOpacity accessibilityRole="button" style={styles.botaoPrincipal}
+            onPress={() => navigation.navigate('CadastroProduto')} activeOpacity={0.8}>
             <Text style={styles.textoBotaoPrincipal}>Cadastrar produto</Text>
           </TouchableOpacity>
-
-          <Text style={styles.tituloSecao}>Produtos disponíveis</Text>
-          {!carregando && infoPagina && infoPagina.totalElements > 0 && (
-            <Text style={styles.resumoLista}>
-              Mostrando {produtos.length} de {infoPagina.totalElements} produtos
+          <View style={styles.cabecalhoSecao}>
+            <Text style={styles.tituloSecao}>Produtos disponíveis</Text>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Atualizar produtos" onPress={lista.atualizar}>
+              <Text style={styles.link}>Atualizar</Text>
+            </TouchableOpacity>
+          </View>
+          {!lista.carregando && lista.pagina && (
+            <Text testID="resumo-produtos" style={styles.resumoLista}>
+              Mostrando {lista.produtos.length} de {lista.pagina.totalElements} produtos
             </Text>
           )}
         </>
       }
-      ListFooterComponent={
-        !carregando && temMaisPaginas ? (
-          <TouchableOpacity
-            style={styles.botaoCarregarMais}
-            onPress={carregarMaisProdutos}
-            activeOpacity={0.8}
-          >
-            {carregandoMais
-              ? <ActivityIndicator color="#1B3A5C" />
-              : <Text style={styles.textoBotaoCarregarMais}>Carregar mais</Text>}
+      ListEmptyComponent={lista.carregando ? <ActivityIndicator style={styles.carregando} size="large" color="#1B3A5C" />
+        : lista.erro ? <View>
+          <Text accessibilityRole="alert" style={styles.erroLista}>{lista.erro}</Text>
+          <TouchableOpacity accessibilityRole="button" style={styles.botaoCarregarMais} onPress={lista.atualizar}>
+            <Text style={styles.textoBotaoCarregarMais}>Tentar novamente</Text>
           </TouchableOpacity>
-        ) : null
-      }
+        </View> : <Text style={styles.listaVazia}>Nenhum produto encontrado. Tente outra busca.</Text>}
+      ListFooterComponent={!lista.carregando && lista.produtos.length > 0 ? <View style={styles.rodapeLista}>
+        <Text testID="paginacao" style={styles.resumoLista}>
+          {lista.produtos.length} de {lista.pagina?.totalElements} produtos carregados · Página {(lista.pagina?.number ?? 0) + 1} de {lista.pagina?.totalPages}
+        </Text>
+        {lista.carregandoMais && <ActivityIndicator accessibilityLabel="Carregando mais produtos" color="#1B3A5C" />}
+        {lista.erroMais ? <>
+          <Text accessibilityRole="alert" style={styles.erroLista}>{lista.erroMais}</Text>
+          <TouchableOpacity accessibilityRole="button" style={styles.botaoCarregarMais} onPress={() => { void lista.carregarMais(true); }}>
+            <Text style={styles.textoBotaoCarregarMais}>Tentar carregar mais</Text>
+          </TouchableOpacity>
+        </> : <Text style={styles.resumoLista}>{lista.temMais ? 'Role para carregar mais produtos.' : 'Você chegou ao fim da lista.'}</Text>}
+      </View> : null}
     />
   );
 }

@@ -21,30 +21,36 @@ export default function ProdutoItem({ produto, favorito, onAlternarFavorito, onP
   }
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <Image source={{ uri: produto.imagem }} style={styles.imagemLista} />
+    <View style={styles.card}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver imagem de ${produto.nome}`} onPress={onPress} activeOpacity={0.8}>
+        <Image source={{ uri: produto.imagem }} style={styles.imagemLista} />
+      </TouchableOpacity>
 
       <View style={styles.informacoesCard}>
-        <Text style={styles.nomeProduto}>{produto.nome}</Text>
-        <Text style={styles.categoria}>Categoria: {produto.categoria}</Text>
-        <Text style={styles.preco}>{formatarPreco(produto.preco)}</Text>
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Ver ${produto.nome}`} onPress={onPress} activeOpacity={0.8}>
+          <Text style={styles.nomeProduto}>{produto.nome}</Text>
+          <Text style={styles.categoria}>Categoria: {produto.categoria}</Text>
+          <Text style={styles.preco}>{formatarPreco(produto.preco)}</Text>
+        </TouchableOpacity>
 
         <View style={styles.linhaAcoes}>
-          <TouchableOpacity style={styles.botaoPequeno} onPress={diminuirQuantidade}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Diminuir quantidade de ${produto.nome}`} style={styles.botaoPequeno} onPress={diminuirQuantidade}>
             <Text style={styles.textoBotaoPequeno}>-</Text>
           </TouchableOpacity>
           <Text style={styles.quantidade}>Qtd.: {quantidade}</Text>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`Aumentar quantidade de ${produto.nome}`}
             style={styles.botaoPequeno}
             onPress={() => setQuantidade(quantidade + 1)}
           >
             <Text style={styles.textoBotaoPequeno}>+</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.botaoFavorito} onPress={onAlternarFavorito}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`${favorito ? 'Remover dos favoritos' : 'Favoritar'} ${produto.nome}`} style={styles.botaoFavorito} onPress={onAlternarFavorito}>
             <Text style={styles.textoFavorito}>{favorito ? 'Salvo' : 'Salvar'}</Text>
           </TouchableOpacity>
         </View>
       </View>
-    </TouchableOpacity>
+    </View>
   );
 }

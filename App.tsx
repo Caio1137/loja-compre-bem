@@ -9,7 +9,10 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={{
+      prefixes: ['comprebem://'],
+      config: { screens: { ListaProdutos: '', DetalheProduto: 'produtos/:produtoId', CadastroProduto: 'cadastro/:produtoId?' } },
+    }}>
       <Stack.Navigator initialRouteName="ListaProdutos">
         <Stack.Screen
           name="ListaProdutos"
